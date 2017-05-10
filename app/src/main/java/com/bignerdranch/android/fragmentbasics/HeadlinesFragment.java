@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 The Android Open Source Project
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,68 +13,113 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.bignerdranch.android.fragmentbasics;
 
-import android.app.Activity;
-import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.ListFragment;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
-public class HeadlinesFragment extends ListFragment {
-    OnHeadlineSelectedListener mCallback;
+import java.util.ArrayList;
+import java.util.List;
 
-    // The container Activity must implement this interface so the frag can deliver messages
+/**
+ * Fragment that displays the news headlines for a particular news category.
+ *
+ * This Fragment displays a list with the news headlines for a particular news category.
+ * When an item is selected, it notifies the configured listener that a headlines was selected.
+ */
+public class HeadlinesFragment extends ListFragment implements OnItemClickListener {
+    // The list of headlines that we are displaying
+    List<String> mHeadlinesList = new ArrayList<String>();
+
+    // The list adapter for the list we are displaying
+    ArrayAdapter<String> mListAdapter;
+
+    // The listener we are to notify when a headline is selected
+    OnHeadlineSelectedListener mHeadlineSelectedListener = null;
+
+    /**
+     * Represents a listener that will be notified of headline selections.
+     */
     public interface OnHeadlineSelectedListener {
-        /** Called by HeadlinesFragment when a list item is selected */
-        public void onArticleSelected(int position);
+        /**
+         * Called when a given headline is selected.
+         * @param index the index of the selected headline.
+         */
+        public void onHeadlineSelected(int index);
     }
 
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        // We need to use a different list item layout for devices older than Honeycomb
-        int layout = Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB ?
-                android.R.layout.simple_list_item_activated_1 : android.R.layout.simple_list_item_1;
-
-        // Create an array adapter for the list view, using the Ipsum headlines array
-        setListAdapter(new ArrayAdapter<String>(getActivity(), layout, Ipsum.Headlines));
+    /**
+     * Default constructor required by framework.
+     */
+    public HeadlinesFragment() {
+        super();
     }
 
     @Override
     public void onStart() {
         super.onStart();
+        setListAdapter(mListAdapter);
+        getListView().setOnItemClickListener(this);
+        loadCategory(0);
+    }
 
-        // When in two-pane layout, set the listview to highlight the selected list item
-        // (We do this during onStart because at the point the listview is available.)
-        if (getFragmentManager().findFragmentById(R.id.article_fragment) != null) {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        mListAdapter = new ArrayAdapter<String>(getActivity(), R.layout.headline_item,
+                mHeadlinesList);
+    }
+
+    /**
+     * Sets the listener that should be notified of headline selection events.
+     * @param listener the listener to notify.
+     */
+    public void setOnHeadlineSelectedListener(OnHeadlineSelectedListener listener) {
+        mHeadlineSelectedListener = listener;
+    }
+
+    /**
+     * Load and display the headlines for the given news category.
+     * @param categoryIndex the index of the news category to display.
+     */
+    public void loadCategory(int categoryIndex) {
+        mHeadlinesList.clear();
+        int i;
+        NewsCategory cat = NewsSource.getInstance().getCategory(categoryIndex);
+        for (i = 0; i < cat.getArticleCount(); i++) {
+            mHeadlinesList.add(cat.getArticle(i).getHeadline());
+        }
+        mListAdapter.notifyDataSetChanged();
+    }
+
+    /**
+     * Handles a click on a headline.
+     *
+     * This causes the configured listener to be notified that a headline was selected.
+     */
+    @Override
+    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+        if (null != mHeadlineSelectedListener) {
+            mHeadlineSelectedListener.onHeadlineSelected(position);
+        }
+    }
+
+    /** Sets choice mode for the list
+     *
+     * @param selectable whether list is to be selectable.
+     */
+    public void setSelectable(boolean selectable) {
+        if (selectable) {
             getListView().setChoiceMode(ListView.CHOICE_MODE_SINGLE);
         }
-    }
-
-    @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
-
-        // This makes sure that the container activity has implemented
-        // the callback interface. If not, it throws an exception.
-        try {
-            mCallback = (OnHeadlineSelectedListener) activity;
-        } catch (ClassCastException e) {
-            throw new ClassCastException(activity.toString()
-                    + " must implement OnHeadlineSelectedListener");
+        else {
+            getListView().setChoiceMode(ListView.CHOICE_MODE_NONE);
         }
-    }
-
-    @Override
-    public void onListItemClick(ListView l, View v, int position, long id) {
-        // Notify the parent activity of selected item
-        mCallback.onArticleSelected(position);
-        
-        // Set the item as checked to be highlighted when in two-pane layout
-        getListView().setItemChecked(position, true);
     }
 }
